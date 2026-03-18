@@ -7,39 +7,36 @@
 #  uri   = "qemu+ssh://root@192.168.100.10/system"
 #}
 
-#resource "libvirt_pool" "centos" {
-#  name = "centos"
-#  type = "dir"
-#  path = "/var/spool/centos"
-#}
+resource "libvirt_pool" "this" {
+  name = "centos"
+  type = "dir"
+  target {
+    path = "/srv/libvirt/images/"
+  }
+}
 
 resource "libvirt_volume" "centos7-qcow2" {
-  name      = "centos7.qcow2"
-  pool      = "default"
-  # source  = "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
-  #source   = "./CentOS-7-x86_64-GenericCloud.qcow2"
-  source    = "/var/lib/libvirt/images/CentOS-7-x86_64-GenericCloud.qcow2"
+  name      = "${var.name}-disk.qcow2"
+  pool      = libvirt_pool.this.name
+  source = "/var/lib/libvirt/images/debian-12-generic-amd64.qcow2"
   format    = "qcow2"
 }
 
-data "template_file" "user_data" {
-  template  = "${file("${path.module}/cloud_init.cfg")}"
-}
-
-data "template_file" "network_config" {
-  template  = "${file("${path.module}/network_config.cfg")}"
-}
+# resource "libvirt_network" "this" {
+#   name = "${var.name}-net"
+#   mode = "bridge"
+#   bridge = "br0"
+#   autostart = true
+# }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
   name      = "commoninit.iso"
-  user_data = "${data.template_file.user_data.rendered}"
-  network_config = "${data.template_file.network_config.rendered}"
-  # pool    = "${libvirt_pool.centos.path}"
+  user_data = templatefile("${path.module}/cloud_init.cfg", { hostname = var.name })
+  network_config = templatefile("${path.module}/network_config.cfg", { hostname = var.name })
 }
 
 # Define KVM domain to create
 resource "libvirt_domain" "db1" {
-  # name    = "db1"
   name      = "${var.name}"
   memory    = "2048"
   vcpu      = 2
@@ -47,8 +44,12 @@ resource "libvirt_domain" "db1" {
   cloudinit = "${libvirt_cloudinit_disk.commoninit.id}"
 
   network_interface {
-    network_name = "default"
-    wait_for_lease = true
+    # network_name = "bridged-network"
+    # hostname = "master"
+    # addresses = ["192.168.109.200"]
+    # network_id = libvirt_network.this.id
+    bridge = "br0"
+    # wait_for_lease = true
     # wait for lease only need for output plugin
   }
 
@@ -60,7 +61,7 @@ resource "libvirt_domain" "db1" {
   #disk {
   #  file = "/var/lib/libvirt/images/config.iso"
   #}
-  
+
   console {
     type = "pty"
     target_type = "virtio"
@@ -74,6 +75,6 @@ resource "libvirt_domain" "db1" {
   }
 }
 
-output "ips" {
-  value = "${libvirt_domain.db1.*.network_interface.0.addresses}"
-}
+# output "ips" {
+#   value = "${libvirt_domain.db1.*.network_interface.0.addresses}"
+# }
