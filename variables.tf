@@ -1,4 +1,4 @@
 variable "name" {
-    type = string
-    default = "deb12"
+  type    = string
+  default = "deb12"
 }
