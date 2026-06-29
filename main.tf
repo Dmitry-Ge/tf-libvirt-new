@@ -1,80 +1,130 @@
-#provider "libvirt" {
-#  uri = "qemu:///system"
-#}
-
-#provider "libvirt" {
-#  alias = "server2"
-#  uri   = "qemu+ssh://root@192.168.100.10/system"
-#}
-
-resource "libvirt_pool" "this" {
-  name = "centos"
-  type = "dir"
-  target {
-    path = "/srv/libvirt/images/"
-  }
-}
-
-resource "libvirt_volume" "centos7-qcow2" {
+resource "libvirt_volume" "this" {
   name      = "${var.name}-disk.qcow2"
-  pool      = libvirt_pool.this.name
-  source = "/var/lib/libvirt/images/debian-12-generic-amd64.qcow2"
-  format    = "qcow2"
-}
+  pool      = "default"
+  capacity  = 1147483648
 
-# resource "libvirt_network" "this" {
-#   name = "${var.name}-net"
-#   mode = "bridge"
-#   bridge = "br0"
-#   autostart = true
-# }
+  target = {
+    format = {
+      type = "qcow2"
+    }
+    permissions = {
+      owner = "64055"
+      group = "109"
+      mode  = "0640"
+    }
+  }
+
+  create = {
+    content = {
+      url = "file:///var/lib/libvirt/images/debian-12-generic-amd64.qcow2"
+    }
+  }
+
+}
 
 resource "libvirt_cloudinit_disk" "commoninit" {
   name      = "commoninit.iso"
-  user_data = templatefile("${path.module}/cloud_init.cfg", { hostname = var.name })
-  network_config = templatefile("${path.module}/network_config.cfg", { hostname = var.name })
+  user_data = file("${path.module}/cloud_init.cfg")
+  network_config = <<-EOF
+    version: 2
+    ethernets:
+      enp1s0:
+        dhcp4: true
+  EOF
+  meta_data = <<-EOF
+    instance-id: db1
+    local-hostname: debian-ws
+  EOF
+}
+
+resource "libvirt_volume" "seed" {
+  name      = "${var.name}-seed.iso"
+  pool      = "default"
+  target = {
+    format = {
+      type = "iso"
+    }
+    # permissions = {
+    #   owner = "64055"
+    #   group = "109"
+    #   mode  = "0640"
+    # }
+  }
+  create = {
+    content = {
+      url = libvirt_cloudinit_disk.commoninit.path
+    }
+  }
 }
 
 # Define KVM domain to create
 resource "libvirt_domain" "db1" {
   name      = "${var.name}"
   memory    = "2048"
+  memory_unit = "MiB"
   vcpu      = 2
-
-  cloudinit = "${libvirt_cloudinit_disk.commoninit.id}"
-
-  network_interface {
-    # network_name = "bridged-network"
-    # hostname = "master"
-    # addresses = ["192.168.109.200"]
-    # network_id = libvirt_network.this.id
-    bridge = "br0"
-    # wait_for_lease = true
-    # wait for lease only need for output plugin
+  os = {
+    type    = "hvm"
+    type_arch    = "x86_64"
+    type_machine = "q35"
   }
 
-  disk {
-    volume_id = "${libvirt_volume.centos7-qcow2.id}"
+  type      = "kvm"
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            volume = libvirt_volume.this.name
+            pool = "default"
+          }
+        }
+        target = {
+          dev = "vda"
+          bus = "virtio"
+        }
+        driver = {
+          type = "qcow2"
+        }
+      },
+      {
+        device = "cdrom"
+        target = {
+          bus = "sata"
+          dev = "sda"
+        }
+        source = {
+          volume = {
+            pool = libvirt_volume.seed.pool
+            volume = libvirt_volume.seed.name
+          }
+        }
+      }
+    ]
+
+    interfaces = [
+      {
+        type  = "network"
+        model = { type = "virtio" }
+        source = {
+          network = {
+            network = "default"
+          }
+        }
+      }
+    ]
+
+    graphics = [
+      {
+        vnc = {
+          auto_port = true
+          listen    = "127.0.0.1"
+        }
+      }
+    ]
   }
 
-  #use pre-builded image cloud-init
-  #disk {
-  #  file = "/var/lib/libvirt/images/config.iso"
-  #}
+  running = true
 
-  console {
-    type = "pty"
-    target_type = "virtio"
-    target_port = "0"
-  }
-
-  graphics {
-    type = "spice"
-    listen_type = "address"
-    autoport = true
-  }
 }
-
-# output "ips" {
-#   value = "${libvirt_domain.db1.*.network_interface.0.addresses}"
-# }

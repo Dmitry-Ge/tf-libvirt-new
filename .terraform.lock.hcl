@@ -2,8 +2,9 @@
 # Manual edits may be lost in future updates.
 
 provider "registry.terraform.io/dmacvicar/libvirt" {
-  version = "0.8.3"
+  version     = "0.9.5"
+  constraints = "0.9.5"
   hashes = [
-    "h1:Tttxr3E9O75MM+dDmq5sYHQEw29PwtIj+XDj/5drdfE=",
+    "h1:h20u2S2Z1sOMkYyn3e290J4LTLN7X+02Wb21fneAcjc=",
   ]
 }
