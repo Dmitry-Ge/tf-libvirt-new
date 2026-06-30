@@ -1,5 +1,8 @@
 resource "libvirt_volume" "this" {
-  name     = "${var.name}-disk.qcow2"
+
+  for_each = var.servers
+
+  name     = "${each.value.name}-disk.qcow2"
   pool     = "default"
   capacity = 1147483648
 
@@ -7,9 +10,10 @@ resource "libvirt_volume" "this" {
     format = {
       type = "qcow2"
     }
+    # permissions according of your libvirt config
     permissions = {
-      owner = "64055"
-      group = "109"
+      owner = "64055"   # user libvirt-qemu
+      group = "109"     # group kvm
       mode  = "0640"
     }
   }
@@ -23,8 +27,10 @@ resource "libvirt_volume" "this" {
 }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
-  name = "commoninit.iso"
-  # user_data      = file("${path.module}/cloud_init.cfg")
+
+  for_each = var.servers
+
+  name = "${each.value.name}-commoninit.iso"
   user_data      = <<-EOF
     #cloud-config
     users:
@@ -89,13 +95,16 @@ resource "libvirt_cloudinit_disk" "commoninit" {
         dhcp4: true
   EOF
   meta_data      = <<-EOF
-    instance-id: ${var.name}
-    local-hostname: ${var.name}
+    instance-id: ${each.value.name}
+    local-hostname: ${each.value.name}
   EOF
 }
 
 resource "libvirt_volume" "seed" {
-  name = "${var.name}-seed.iso"
+
+  for_each = var.servers
+
+  name = "${each.value.name}-seed.iso"
   pool = "default"
   target = {
     format = {
@@ -109,17 +118,21 @@ resource "libvirt_volume" "seed" {
   }
   create = {
     content = {
-      url = libvirt_cloudinit_disk.commoninit.path
+      url = libvirt_cloudinit_disk.commoninit[each.key].path
     }
   }
 }
 
 # Define KVM domain to create
 resource "libvirt_domain" "db1" {
-  name        = var.name
-  memory      = "2048"
+
+  for_each = var.servers
+
+  name   = each.value.name
+  memory = each.value.ram
+  vcpu   = each.value.cpu
   memory_unit = "MiB"
-  vcpu        = 2
+
   os = {
     type         = "hvm"
     type_arch    = "x86_64"
@@ -133,7 +146,7 @@ resource "libvirt_domain" "db1" {
       {
         source = {
           volume = {
-            volume = libvirt_volume.this.name
+            volume = libvirt_volume.this[each.key].name
             pool   = "default"
           }
         }
@@ -153,8 +166,8 @@ resource "libvirt_domain" "db1" {
         }
         source = {
           volume = {
-            pool   = libvirt_volume.seed.pool
-            volume = libvirt_volume.seed.name
+            pool   = libvirt_volume.seed[each.key].pool
+            volume = libvirt_volume.seed[each.key].name
           }
         }
       }
