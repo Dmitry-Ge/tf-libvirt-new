@@ -1,0 +1,3 @@
+ssh-public-key = "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAqY3...cccaaazzz"
+# mkpasswd --method=SHA-512 --rounds=4096
+password       = "$6$rounds=4096$.qP9LKY90wfffxxxzzz"
