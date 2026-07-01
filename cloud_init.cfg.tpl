@@ -45,6 +45,8 @@ packages:
 #  - sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
 #  - yum -y remove cloud-init
 #  - systemctl enable qemu-guest-agent.service && systemctl start qemu-guest-agent.service
+bootcmd:
+  - echo "UMASK 027" >> /etc/login.defs
 
 # Configure where output will go
 output:
