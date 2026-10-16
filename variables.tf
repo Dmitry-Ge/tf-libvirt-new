@@ -1,13 +1,13 @@
 variable "ssh-public-key" {
   description = "SSH public key"
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 variable "password" {
   description = "Password"
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 variable "servers" {
@@ -30,4 +30,10 @@ variable "servers" {
       ram  = 2048
     }
   }
+}
+
+variable "disk_size" {
+  description = "Disk size in GB"
+  type        = number
+  default     = 4
 }

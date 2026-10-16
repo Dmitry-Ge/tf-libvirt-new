@@ -21,10 +21,10 @@ cloud_config_modules:
 
 timezone: Europe/Moscow
 
-manage_resolv_conf: true
+# manage_resolv_conf: true
 
-resolv_conf:
-  nameservers: ['192.168.109.3']
+# resolv_conf:
+#   nameservers: ['192.168.109.3']
 
 # Update/Upgrade & Reboot if necessary
 package_update: false

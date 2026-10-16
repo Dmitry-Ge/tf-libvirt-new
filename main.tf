@@ -4,7 +4,8 @@ resource "libvirt_volume" "this" {
 
   name     = "${each.value.name}-disk.qcow2"
   pool     = "default"
-  capacity = 1147483648
+  capacity = var.disk_size * 1024 * 1024 * 1024
+
 
   target = {
     format = {
@@ -12,8 +13,8 @@ resource "libvirt_volume" "this" {
     }
     # permissions according of your libvirt config
     permissions = {
-      owner = "64055"   # user libvirt-qemu
-      group = "109"     # group kvm
+      owner = "64055" # user libvirt-qemu
+      group = "109"   # group kvm
       mode  = "0640"
     }
   }
@@ -26,6 +27,27 @@ resource "libvirt_volume" "this" {
 
 }
 
+resource "terraform_data" "resize_disk" {
+  depends_on = [libvirt_volume.this]
+
+  for_each = var.servers
+
+  connection {
+    type = "ssh"
+    host = "localhost"
+    user = "dmitryg"
+    private_key = file("~/.ssh/id_rsa")
+    port = 22
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo qemu-img resize ${libvirt_volume.this[each.key].path} +${var.disk_size}G",
+    ]
+  }
+}
+
+
 resource "libvirt_cloudinit_disk" "commoninit" {
 
   for_each = var.servers
@@ -33,9 +55,9 @@ resource "libvirt_cloudinit_disk" "commoninit" {
   name = "${each.value.name}-commoninit.iso"
 
   user_data = templatefile("${path.module}/cloud_init.cfg.tpl", {
-    password = var.password,
+    password       = var.password,
     ssh-public-key = var.ssh-public-key,
-    packages = ["git", "qemu-guest-agent", "curl", "wireless-regdb"]
+    packages       = ["git", "qemu-guest-agent", "curl", "wireless-regdb"]
   })
 
   network_config = <<-EOF
@@ -45,7 +67,7 @@ resource "libvirt_cloudinit_disk" "commoninit" {
         dhcp4: true
   EOF
 
-  meta_data      = <<-EOF
+  meta_data = <<-EOF
     instance-id: ${each.value.name}
     local-hostname: ${each.value.name}
   EOF
@@ -80,9 +102,9 @@ resource "libvirt_domain" "db1" {
 
   for_each = var.servers
 
-  name   = each.value.name
-  memory = each.value.ram
-  vcpu   = each.value.cpu
+  name        = each.value.name
+  memory      = each.value.ram
+  vcpu        = each.value.cpu
   memory_unit = "MiB"
 
   os = {
@@ -149,4 +171,31 @@ resource "libvirt_domain" "db1" {
 
   running = true
 
+}
+# pause 30 seconds after boot
+resource "time_sleep" "wait_10_seconds" {
+  depends_on = [libvirt_domain.db1]
+  create_duration = "10s"
+}
+
+
+# we need hard reset vm after deploy
+resource "null_resource" "hard_reset" {
+
+  depends_on = [time_sleep.wait_10_seconds]
+
+  for_each = var.servers
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo virsh reset ${each.value.name}",
+    ]
+    connection {
+      type = "ssh"
+      host = "localhost"
+      user = "dmitryg"
+      private_key = file("~/.ssh/id_rsa")
+      port = 22
+    }
+  }
 }
