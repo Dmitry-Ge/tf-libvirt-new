@@ -37,3 +37,9 @@ variable "disk_size" {
   type        = number
   default     = 4
 }
+
+variable "username" {
+  description = "Username of local user"
+  type        = string
+  default     = "dmitryg"
+}

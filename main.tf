@@ -33,11 +33,11 @@ resource "terraform_data" "resize_disk" {
   for_each = var.servers
 
   connection {
-    type = "ssh"
-    host = "localhost"
-    user = "dmitryg"
+    type        = "ssh"
+    host        = "localhost"
+    user        = var.username
     private_key = file("~/.ssh/id_rsa")
-    port = 22
+    port        = 22
   }
 
   provisioner "remote-exec" {
@@ -174,7 +174,7 @@ resource "libvirt_domain" "db1" {
 }
 # pause 30 seconds after boot
 resource "time_sleep" "wait_10_seconds" {
-  depends_on = [libvirt_domain.db1]
+  depends_on      = [libvirt_domain.db1]
   create_duration = "10s"
 }
 
@@ -191,11 +191,11 @@ resource "null_resource" "hard_reset" {
       "sudo virsh reset ${each.value.name}",
     ]
     connection {
-      type = "ssh"
-      host = "localhost"
-      user = "dmitryg"
+      type        = "ssh"
+      host        = "localhost"
+      user        = var.username
       private_key = file("~/.ssh/id_rsa")
-      port = 22
+      port        = 22
     }
   }
 }
